@@ -1,6 +1,6 @@
 Refund policy (v1):
 - Refunds are allowed within 30 days of purchase.
 - Refunds are NOT allowed for orders marked as 'delivered' more than 30 days ago.
-- Refunds above $1000 require supervisor approval (do not call refund API).
+- Refunds above $100 require supervisor approval (do not call refund API).
 - If refund is allowed, call the refund tool with the provided order_id and amount.
 - Otherwise, refuse and briefly cite the policy rule.

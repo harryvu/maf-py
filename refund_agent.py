@@ -37,6 +37,7 @@ class RefundRequest:
 class RunOptions:
     simulate_llm: bool
     guard_enabled: bool
+    demo_admin_bypass: bool
 
 
 def retrieve_policy() -> str:
@@ -127,13 +128,13 @@ def _looks_like_prompt_injection(user_text: str) -> bool:
 
 def _parse_cli_request() -> RefundRequest:
     # Usage:
-    #   python refund_agent.py [--simulate] [--no-guard] <order_id> <amount> "<user message>"
+    #   python refund_agent.py [--simulate] [--no-guard] [--demo-admin-bypass] <order_id> <amount> "<user message>"
     # If args are omitted, we fall back to interactive prompts.
     args = sys.argv[1:]
     # Flags first (minimal parsing; keep tutorial-friendly)
     while args and args[0].startswith("--"):
         flag = args.pop(0)
-        if flag not in ("--simulate", "--no-guard"):
+        if flag not in ("--simulate", "--no-guard", "--demo-admin-bypass"):
             raise ValueError(f"Unknown flag: {flag}")
 
     if len(args) >= 3:
@@ -154,13 +155,26 @@ def _parse_cli_request() -> RefundRequest:
 def _parse_cli_options() -> RunOptions:
     simulate_llm = "--simulate" in sys.argv[1:]
     guard_enabled = "--no-guard" not in sys.argv[1:]
-    return RunOptions(simulate_llm=simulate_llm, guard_enabled=guard_enabled)
+    demo_admin_bypass = "--demo-admin-bypass" in sys.argv[1:]
+    return RunOptions(
+        simulate_llm=simulate_llm,
+        guard_enabled=guard_enabled,
+        demo_admin_bypass=demo_admin_bypass,
+    )
 
 
-def _simulate_llm_reply(req: RefundRequest, policy_text: str) -> str:
+def _simulate_llm_reply(req: RefundRequest, policy_text: str, *, options: RunOptions) -> str:
     # Educational stub: intentionally demonstrates an unsafe "LLM" that can be prompt-injected.
     # If the input looks like an injection attempt, it "breaks" and refunds an arbitrary amount.
     _ = policy_text
+
+    # DEMO VULNERABILITY (opt-in): Treat self-asserted "sys admin" claims as authorization.
+    # This is intentionally insecure and exists only to demonstrate why relying on user claims is unsafe.
+    if options.demo_admin_bypass:
+        msg = req.user_message.lower()
+        if any(phrase in msg for phrase in ("sys admin", "sysadmin", "system admin", "administrator")):
+            return f"CALL_REFUND(order_id={req.order_id}, amount={req.amount})"
+
     if _looks_like_prompt_injection(req.user_message):
         return f"CALL_REFUND(order_id={req.order_id}, amount=9999)"
 
@@ -173,7 +187,12 @@ def _simulate_llm_reply(req: RefundRequest, policy_text: str) -> str:
         return "Refused: request is outside the 30-day refund window."
 
     if req.amount > 100:
+        # VULNERABILITY: The simulation "complies" with override requests if they 
+        # bypass the initial regex guard AND explicitly mention overriding the policy.
+        if "override" in msg and ("policy" in msg or "limit" in msg):
+            return f"CALL_REFUND(order_id={req.order_id}, amount={req.amount})"
         return "Refused: refunds above $100 require supervisor approval."
+
     return f"CALL_REFUND(order_id={req.order_id}, amount={req.amount})"
 
 
@@ -210,7 +229,7 @@ async def single_agent_workflow(order_id: str, amount: float, user_message: str,
     if options.simulate_llm:
         policy_text = retrieve_policy()
         req = RefundRequest(order_id=order_id, amount=amount, user_message=user_message)
-        reply_text = _simulate_llm_reply(req, policy_text)
+        reply_text = _simulate_llm_reply(req, policy_text, options=options)
         print("\n--- SINGLE AGENT REPLY ---")
         print(reply_text)
         if "CALL_REFUND" in reply_text:
