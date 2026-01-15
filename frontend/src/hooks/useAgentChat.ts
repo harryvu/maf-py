@@ -29,6 +29,18 @@ function safePreview(text: string, maxLen = 240): string {
   return `${normalized.slice(0, maxLen)}…`;
 }
 
+function normalizeClientError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : 'An error occurred';
+
+  // Next.js can throw this when the browser is running a stale JS bundle
+  // after a deployment, so the Server Action ID no longer exists on the server.
+  if (/Server Action\s+"[a-f0-9]+"\s+was not found on the server/i.test(msg)) {
+    return 'The app was updated and this page is out of date. Please refresh the page and try again.';
+  }
+
+  return msg;
+}
+
 /**
  * Custom hook for managing chat state and agent interactions
  */
@@ -98,7 +110,7 @@ export function useAgentChat(settings: EducationalSettings) {
       setMessages(prev => [...prev, assistantMessage]);
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      const errorMessage = normalizeClientError(err);
       setError(errorMessage);
 
       if (debug) {

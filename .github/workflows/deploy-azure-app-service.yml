@@ -86,6 +86,9 @@ jobs:
           test -f "${DEPLOY_PATH}/server.js"
           test -f "${DEPLOY_PATH}/.next/BUILD_ID"
           test -d "${DEPLOY_PATH}/.next/static"
+          # Server Actions / RSC references must be present for production.
+          test -f "${DEPLOY_PATH}/.next/server/server-reference-manifest.json"
+          test -d "${DEPLOY_PATH}/.next/server/app"
 
       - name: Validate required secrets
         shell: bash
