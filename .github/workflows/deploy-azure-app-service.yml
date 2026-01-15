@@ -73,6 +73,14 @@ jobs:
             cp -R "${APP_PATH}/public" "${DEPLOY_PATH}/public"
           fi
 
+      - name: Verify deploy package layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${DEPLOY_PATH}/server.js"
+          test -f "${DEPLOY_PATH}/.next/BUILD_ID"
+          test -d "${DEPLOY_PATH}/.next/static"
+
       - name: Validate required secrets
         shell: bash
         run: |

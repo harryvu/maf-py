@@ -19,5 +19,6 @@ param appSettings = {
   // AZURE_OPENAI_API_KEY: '...'
   // AZURE_OPENAI_RESOURCE_NAME: '...'
   // AZURE_OPENAI_DEPLOYMENT: '...'
-  AZURE_OPENAI_API_VERSION: 'preview'
+  // Use a real API version string; override in Azure App Settings if needed.
+  AZURE_OPENAI_API_VERSION: '2024-06-01'
 }

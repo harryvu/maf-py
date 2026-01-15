@@ -35,3 +35,16 @@ Note: the script compiles `.bicepparam` files to ARM JSON parameters automatical
 - The template sets the Web App Startup Command to `node server.js` (Linux). Until you deploy the app, the site may show **Application Error** because `server.js` does not exist yet.
 - After the first successful deployment, browsing the site should work normally.
 - Configure any app settings you need (e.g. Azure OpenAI env vars) under App Service → Configuration.
+
+### Configure Azure OpenAI (Real LLM mode)
+
+Real LLM mode requires these App Service settings:
+
+- `AZURE_OPENAI_ENDPOINT` (e.g. `https://<resource>.openai.azure.com/`)
+- `AZURE_OPENAI_DEPLOYMENT` (your chat deployment name)
+- `AZURE_OPENAI_API_VERSION` (e.g. `2024-06-01`)
+- `AZURE_OPENAI_API_KEY` (secret)
+
+Helper script (recommended for dev):
+
+- `./scripts/set-azure-openai-appsettings.ps1 -ResourceGroup maf-py-dev-rg -WebAppName maf-py-dev-web -Endpoint https://... -Deployment ... -ApiVersion 2024-06-01 -ApiKey ...`

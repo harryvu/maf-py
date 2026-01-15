@@ -30,9 +30,19 @@ export function getAzureOpenAIConfig(
     );
   }
 
+  const apiVersion = env.AZURE_OPENAI_API_VERSION ?? '2024-06-01';
+  if (apiVersion.trim().toLowerCase() === 'preview') {
+    throw new Error(
+      'Azure OpenAI is not configured: AZURE_OPENAI_API_VERSION="preview" is not a valid API version. Use a dated API version (e.g. "2024-06-01").'
+    );
+  }
+
   const endpoint = env.AZURE_OPENAI_ENDPOINT;
-  const normalizedEndpointBaseUrl = endpoint
-    ? `${endpoint.replace(/\/+$/, '')}/openai`
+  const normalizedEndpoint = endpoint ? endpoint.replace(/\/+$/, '') : undefined;
+  const normalizedEndpointBaseUrl = normalizedEndpoint
+    ? normalizedEndpoint.endsWith('/openai')
+      ? normalizedEndpoint
+      : `${normalizedEndpoint}/openai`
     : undefined;
 
   const baseURL = env.AZURE_OPENAI_BASE_URL ?? normalizedEndpointBaseUrl;
@@ -57,7 +67,7 @@ export function getAzureOpenAIConfig(
     apiKey,
     baseURL,
     resourceName,
-    apiVersion: env.AZURE_OPENAI_API_VERSION ?? 'preview',
+    apiVersion,
     deploymentId,
   };
 }

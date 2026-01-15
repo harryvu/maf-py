@@ -38,8 +38,13 @@ AZURE_OPENAI_DEPLOYMENT="<your-chat-deployment-id>"
 AZURE_OPENAI_CHAT_DEPLOYMENT_NAME="<your-chat-deployment-id>"
 
 # Optional
-AZURE_OPENAI_API_VERSION="preview"
+AZURE_OPENAI_API_VERSION="2024-06-01"
 ```
+
+### Azure App Service configuration
+
+If you deployed to Azure App Service, set the same variables under **App Service → Configuration** (or via `az webapp config appsettings set`).
+For dev, you can use: `./scripts/set-azure-openai-appsettings.ps1` from repo root.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
