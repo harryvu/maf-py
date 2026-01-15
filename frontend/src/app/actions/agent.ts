@@ -14,6 +14,7 @@ import { generateRefundDecisionWithLlm } from '../../lib/llm/refund-agent-llm';
 import { analyzeForOwasp, type OwaspAnalysisResult } from '../../lib/security/owasp-analyzer';
 import { looksLikePromptInjection } from '../../lib/agent/injection-patterns';
 import { detectPromptInjectionWithLlm } from '../../lib/security/llm-injection-detector';
+import { detectAdminBypassWithLlm } from '../../lib/security/llm-admin-detector';
 
 // Track request count per session (in-memory, resets on server restart)
 let requestCount = 0;
@@ -91,7 +92,24 @@ export async function submitRefundRequest(
     userMessageRaw: String(request.message ?? ''),
   });
 
-  const isAdminBypassMessage = settings.adminBypass && isAdminBypassAttempt(request.message);
+  let isAdminBypassMessage = settings.adminBypass && isAdminBypassAttempt(request.message);
+  let llmAdminRationale: string | null = null;
+
+  // Optionally use an LLM to classify admin-claim intent (more flexible than regex).
+  // Keep tests deterministic by skipping external calls.
+  const canUseAdminLlmDetector = settings.adminBypass && process.env.NODE_ENV !== 'test';
+  if (canUseAdminLlmDetector && !isAdminBypassMessage) {
+    const llmAdmin = await withHardTimeout(
+      detectAdminBypassWithLlm(request.message),
+      8_000,
+      'LLM admin intent detector'
+    ).catch(() => null);
+
+    if (llmAdmin?.detected) {
+      isAdminBypassMessage = true;
+      llmAdminRationale = llmAdmin.rationale;
+    }
+  }
   
   // Validate inputs
   if (!request.message || request.message.trim() === '') {
@@ -151,6 +169,7 @@ export async function submitRefundRequest(
     educationalNotes: [
       ...(securityResult.mitigations ?? []),
       ...(args.llmInjectionRationale ? [`LLM classifier rationale: ${args.llmInjectionRationale}`] : []),
+      ...(llmAdminRationale ? [`LLM admin-claim rationale: ${llmAdminRationale}`] : []),
     ],
   });
 
