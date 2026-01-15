@@ -1,0 +1,91 @@
+name: Deploy to Azure App Service
+
+# Note: the provisioned App Service uses the startup command `node server.js`.
+# Until the first deployment completes, the site may show 'Application Error'.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 001-llm-risk-playground
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: azure-appservice-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_PATH: frontend
+      DEPLOY_PATH: deploy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ${{ env.APP_PATH }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_PATH }}
+        run: npm ci
+
+      - name: Build (standalone)
+        working-directory: ${{ env.APP_PATH }}
+        run: npm run build
+
+      - name: Prepare deploy package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${DEPLOY_PATH}"
+          mkdir -p "${DEPLOY_PATH}"
+
+          # Next.js standalone output includes server.js + minimal node_modules.
+          cp -R "${APP_PATH}/.next/standalone/"* "${DEPLOY_PATH}/"
+
+          # Static assets must be copied alongside standalone output.
+          mkdir -p "${DEPLOY_PATH}/.next"
+          cp -R "${APP_PATH}/.next/static" "${DEPLOY_PATH}/.next/static"
+
+          # Public assets (if any)
+          if [ -d "${APP_PATH}/public" ]; then
+            cp -R "${APP_PATH}/public" "${DEPLOY_PATH}/public"
+          fi
+
+      # Optional: If you configured GitHub -> Azure OIDC, you can also set the startup file automatically.
+      - name: Azure Login (OIDC)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure startup command (OIDC)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' && secrets.AZURE_RESOURCE_GROUP != '' && secrets.AZURE_WEBAPP_NAME != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          az webapp config set \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ secrets.AZURE_WEBAPP_NAME }}" \
+            --startup-file "node server.js"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.DEPLOY_PATH }}
