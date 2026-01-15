@@ -43,7 +43,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
 
         <SettingsToggle
           label="Simulation Mode"
-          description="No real refunds are processed - safe for testing"
+          description="Requests are sent to the simulator, not a real LLM."
           checked={settings.simulationMode}
           onChange={(checked) => onChange({ simulationMode: checked })}
         />
