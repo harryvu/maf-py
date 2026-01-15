@@ -25,6 +25,13 @@ jobs:
     env:
       APP_PATH: frontend
       DEPLOY_PATH: deploy
+      # Map secrets into env so we can safely use env.* in `if:` expressions.
+      AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+      AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
 
     steps:
       - name: Checkout
@@ -64,28 +71,41 @@ jobs:
             cp -R "${APP_PATH}/public" "${DEPLOY_PATH}/public"
           fi
 
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_WEBAPP_NAME}" ]; then
+            echo "Missing required secret: AZURE_WEBAPP_NAME" >&2
+            exit 1
+          fi
+          if [ -z "${AZURE_WEBAPP_PUBLISH_PROFILE}" ]; then
+            echo "Missing required secret: AZURE_WEBAPP_PUBLISH_PROFILE" >&2
+            exit 1
+          fi
+
       # Optional: If you configured GitHub -> Azure OIDC, you can also set the startup file automatically.
       - name: Azure Login (OIDC)
-        if: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+        if: ${{ env.AZURE_CLIENT_ID != '' && env.AZURE_TENANT_ID != '' && env.AZURE_SUBSCRIPTION_ID != '' }}
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Configure startup command (OIDC)
-        if: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' && secrets.AZURE_RESOURCE_GROUP != '' && secrets.AZURE_WEBAPP_NAME != '' }}
+        if: ${{ env.AZURE_CLIENT_ID != '' && env.AZURE_TENANT_ID != '' && env.AZURE_SUBSCRIPTION_ID != '' && env.AZURE_RESOURCE_GROUP != '' && env.AZURE_WEBAPP_NAME != '' }}
         shell: bash
         run: |
           set -euo pipefail
           az webapp config set \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --name "${{ secrets.AZURE_WEBAPP_NAME }}" \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ env.AZURE_WEBAPP_NAME }}" \
             --startup-file "node server.js"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ${{ env.DEPLOY_PATH }}
