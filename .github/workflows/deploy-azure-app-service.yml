@@ -60,7 +60,9 @@ jobs:
           mkdir -p "${DEPLOY_PATH}"
 
           # Next.js standalone output includes server.js + minimal node_modules.
-          cp -R "${APP_PATH}/.next/standalone/"* "${DEPLOY_PATH}/"
+          # IMPORTANT: use '/.' so we also copy hidden directories (like '.next')
+          # because bash globs ('*') do not match dotfiles.
+          cp -R "${APP_PATH}/.next/standalone/." "${DEPLOY_PATH}/"
 
           # Static assets must be copied alongside standalone output.
           mkdir -p "${DEPLOY_PATH}/.next"
