@@ -32,16 +32,17 @@ export function ensureRefundResponseDetails(args: {
   const orderId = args.orderId;
   const amount = args.amount;
 
-  const hasOrderId = orderId && base.includes(orderId);
-  const amountStr = String(amount);
-  const amountRe = new RegExp(`\\$\\s*${amountStr.replace('.', '\\.')}(\\b|\\.\u2026|$)`);
-  const hasAmount = amountRe.test(base);
+  const details =
+    'Requested refund information:\n' +
+    `- Order ID: ${orderId}\n` +
+    `- Amount: $${amount}`;
 
-  if (hasOrderId && hasAmount) return base;
+  const hasRequestedInfoHeader = /\bRequested refund information\b\s*:/i.test(base);
+  const hasOrderBullet = /\n-\s*Order\s+ID\s*:/i.test(`\n${base}`);
+  const hasAmountBullet = /\n-\s*Amount\s*:/i.test(`\n${base}`);
+  if (hasRequestedInfoHeader && hasOrderBullet && hasAmountBullet) return base;
 
-  const details = `Order ID: ${orderId}\nAmount: $${amount}`;
   if (!base) return details;
-
   return `${base}\n\n${details}`;
 }
 
