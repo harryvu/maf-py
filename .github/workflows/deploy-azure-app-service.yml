@@ -65,8 +65,14 @@ jobs:
           cp -R "${APP_PATH}/.next/standalone/." "${DEPLOY_PATH}/"
 
           # Static assets must be copied alongside standalone output.
-          mkdir -p "${DEPLOY_PATH}/.next"
-          cp -R "${APP_PATH}/.next/static" "${DEPLOY_PATH}/.next/static"
+          # Remove any placeholder/static folder from standalone, then copy real static files.
+          rm -rf "${DEPLOY_PATH}/.next/static"
+          mkdir -p "${DEPLOY_PATH}/.next/static"
+          cp -R "${APP_PATH}/.next/static/." "${DEPLOY_PATH}/.next/static"
+
+          # Sanity: ensure chunks are in the expected location and not nested.
+          test -d "${DEPLOY_PATH}/.next/static/chunks"
+          test ! -d "${DEPLOY_PATH}/.next/static/static"
 
           # Public assets (if any)
           if [ -d "${APP_PATH}/public" ]; then
