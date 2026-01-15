@@ -94,6 +94,9 @@ export function getAzureChatModel(
     apiVersion: cfg.apiVersion,
     baseURL: cfg.baseURL,
     resourceName: cfg.resourceName,
+    // Dated Azure OpenAI api versions (e.g. 2024-10-21) require the legacy
+    // deployment-based URL format on Azure.
+    useDeploymentBasedUrls: true,
   });
 
   return azure.chat(cfg.deploymentId);
