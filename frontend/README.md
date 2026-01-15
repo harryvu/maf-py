@@ -59,3 +59,30 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deploy to Azure App Service (GitHub Actions)
+
+This repo includes a GitHub Actions workflow that builds a **standalone** Next.js bundle (via `next build --webpack`) and deploys it to Azure App Service.
+
+Workflow: `.github/workflows/deploy-azure-app-service.yml`
+
+### Required GitHub Secrets
+
+- `AZURE_WEBAPP_NAME`: Your App Service name
+- `AZURE_WEBAPP_PUBLISH_PROFILE`: Publish profile XML (download from the App Service in Azure Portal)
+
+### Optional (recommended): OIDC secrets (auto-configure startup command)
+
+If you set up GitHub → Azure federated credentials, add:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_RESOURCE_GROUP`
+
+### App Service runtime
+
+The standalone build starts with `node server.js`.
+
+- Linux App Service: set Startup Command to `node server.js` (or supply the optional OIDC secrets so the workflow sets it).
+

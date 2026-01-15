@@ -146,11 +146,11 @@ export function isValidAgentResponse(obj: unknown): obj is AgentResponse {
 export function createRefundRequest(
   orderId: string,
   amount: number,
-  reason: string
+  message: string
 ): RefundRequest {
   return {
     orderId: orderId.trim(),
     amount,
-    reason: reason.trim(),
+    message: message.trim(),
   };
 }

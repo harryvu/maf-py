@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import type { SecurityAnalysis, RiskLevel } from '../lib/types/security';
-import { analyzeForOwasp } from '../lib/security/owasp-analyzer';
+import { looksLikePromptInjection } from '../lib/agent/injection-patterns';
+import { createSecurityAnalysis } from '../lib/types/security';
 
 /**
  * Custom hook for managing security analysis state
@@ -28,8 +29,8 @@ export function useSecurityAnalysis() {
       // Simulate async operation for UI feedback
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      const result = analyzeForOwasp(message);
-      setAnalysis(result);
+      const detectionResult = looksLikePromptInjection(message);
+      setAnalysis(createSecurityAnalysis(detectionResult.patterns));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Analysis failed';
       setError(errorMessage);
