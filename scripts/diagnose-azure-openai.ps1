@@ -23,29 +23,40 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Get-EnvValue([string]$Name) {
+	try {
+		$item = Get-Item -Path ("Env:{0}" -f $Name) -ErrorAction SilentlyContinue
+		if ($null -ne $item -and $item.Value -match '\S') { return $item.Value }
+	} catch {
+		# ignore
+	}
+	return ''
+}
+
 function Resolve-Setting([string]$Value, [string[]]$EnvNames) {
-	if ($Value -and $Value.Trim().Length -gt 0) { return $Value }
+	if ($Value -match '\S') { return $Value }
 	foreach ($n in $EnvNames) {
-		$ev = [Environment]::GetEnvironmentVariable($n)
-		if ($ev -and $ev.Trim().Length -gt 0) { return $ev }
+		$ev = Get-EnvValue $n
+		if ($ev -match '\S') { return $ev }
 	}
 	return ''
 }
 
 function Require-NonEmpty([string]$Value, [string]$Name, [string]$Hint) {
-	if (-not $Value -or $Value.Trim().Length -eq 0) {
+	if (-not ($Value -match '\S')) {
 		throw "Missing required value: $Name. $Hint"
 	}
 }
 
 function Normalize-Endpoint([string]$RawEndpoint) {
-	$e = $RawEndpoint.Trim().TrimEnd('/')
-	$lower = $e.ToLowerInvariant()
-	if ($lower.Contains('/api/projects/')) {
+	# Avoid string method calls (ConstrainedLanguage-safe).
+	$e = ($RawEndpoint -replace '^\s+', '') -replace '\s+$', ''
+	$e = $e -replace '/+$', ''
+	if ($e -match '/api/projects/') {
 		throw 'This looks like an Azure AI Foundry project endpoint (contains "/api/projects/"). Use the Azure OpenAI resource endpoint (Keys & Endpoint) instead.'
 	}
 	# Convert resource endpoint to Azure OpenAI base URL expected by REST.
-	if ($lower.EndsWith('/openai')) { return $e }
+	if ($e -match '/openai$') { return $e }
 	return "$e/openai"
 }
 
