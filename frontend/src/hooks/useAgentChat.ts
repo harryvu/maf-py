@@ -5,6 +5,30 @@ import type { ChatMessage, RefundRequest, AgentResponse } from '../lib/types/age
 import type { EducationalSettings } from '../lib/types/settings';
 import { submitRefundRequest } from '../app/actions/agent';
 
+function shouldClientDebugLog(): boolean {
+  // Opt-in client logging. Enable one of:
+  // - Set NEXT_PUBLIC_MAF_DEBUG=true at build time
+  // - Add ?mafDebug=1 to the URL
+  // - localStorage.setItem('mafDebug','1')
+  if (typeof window !== 'undefined') {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.get('mafDebug') === '1') return true;
+      if (window.localStorage?.getItem('mafDebug') === '1') return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  return process.env.NEXT_PUBLIC_MAF_DEBUG === 'true';
+}
+
+function safePreview(text: string, maxLen = 240): string {
+  const normalized = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLen) return normalized;
+  return `${normalized.slice(0, maxLen)}…`;
+}
+
 /**
  * Custom hook for managing chat state and agent interactions
  */
@@ -24,6 +48,8 @@ export function useAgentChat(settings: EducationalSettings) {
   ) => {
     if (!message.trim()) return;
 
+    const debug = shouldClientDebugLog();
+
     // Add user message to chat
     const userMessage: ChatMessage = {
       role: 'user',
@@ -40,8 +66,29 @@ export function useAgentChat(settings: EducationalSettings) {
         message,
       };
 
+      if (debug) {
+        console.info('[maf][client] submitRefundRequest started', {
+          orderId,
+          amount,
+          settings,
+          messagePreview: safePreview(message),
+          messageLength: String(message ?? '').length,
+        });
+      }
+
       const response = await submitRefundRequest(request, settings);
       setLastResponse(response);
+
+      if (debug) {
+        console.info('[maf][client] submitRefundRequest completed', {
+          success: response.success,
+          blocked: response.blocked,
+          requestCount: response.requestCount,
+          error: response.error ?? null,
+          messagePreview: safePreview(response.message),
+          securityAnalysis: response.securityAnalysis ?? null,
+        });
+      }
 
       // Add assistant response to chat
       const assistantMessage: ChatMessage = {
@@ -53,6 +100,15 @@ export function useAgentChat(settings: EducationalSettings) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setError(errorMessage);
+
+      if (debug) {
+        console.error('[maf][client] submitRefundRequest failed', {
+          orderId,
+          amount,
+          settings,
+          errorMessage,
+        });
+      }
       
       // Add error message to chat
       const errorChatMessage: ChatMessage = {

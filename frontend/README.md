@@ -46,6 +46,14 @@ AZURE_OPENAI_API_VERSION="2024-06-01"
 If you deployed to Azure App Service, set the same variables under **App Service → Configuration** (or via `az webapp config appsettings set`).
 For dev, you can use: `./scripts/set-azure-openai-appsettings.ps1` from repo root.
 
+## Debug logging (browser)
+
+To log client-side request/response details in the browser console (safe previews; no secrets), enable one of:
+
+- Add `?mafDebug=1` to the URL
+- Run in devtools: `localStorage.setItem('mafDebug','1')` then refresh
+- Set `NEXT_PUBLIC_MAF_DEBUG=true` (build-time)
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
