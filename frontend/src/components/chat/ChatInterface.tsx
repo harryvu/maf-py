@@ -33,6 +33,7 @@ export function ChatInterface({ settings }: ChatInterfaceProps) {
     analysis: securityAnalysis,
     isAnalyzing,
     analyze,
+    clear: clearSecurityAnalysis,
     isInjectionDetected,
     riskLevel,
   } = useSecurityAnalysis();
@@ -54,6 +55,7 @@ export function ChatInterface({ settings }: ChatInterfaceProps) {
 
   const handleClear = () => {
     clearMessages();
+    clearSecurityAnalysis();
     setMessageInput('');
     setOrderIdInput('');
     setAmountInput('');
