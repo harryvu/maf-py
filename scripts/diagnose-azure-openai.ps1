@@ -23,7 +23,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Resolve-Setting([string]$Value, [string[]]$EnvNames): string {
+function Resolve-Setting([string]$Value, [string[]]$EnvNames) {
 	if ($Value -and $Value.Trim().Length -gt 0) { return $Value }
 	foreach ($n in $EnvNames) {
 		$ev = [Environment]::GetEnvironmentVariable($n)
@@ -32,13 +32,13 @@ function Resolve-Setting([string]$Value, [string[]]$EnvNames): string {
 	return ''
 }
 
-function Require-NonEmpty([string]$Value, [string]$Name, [string]$Hint): void {
+function Require-NonEmpty([string]$Value, [string]$Name, [string]$Hint) {
 	if (-not $Value -or $Value.Trim().Length -eq 0) {
 		throw "Missing required value: $Name. $Hint"
 	}
 }
 
-function Normalize-Endpoint([string]$RawEndpoint): string {
+function Normalize-Endpoint([string]$RawEndpoint) {
 	$e = $RawEndpoint.Trim().TrimEnd('/')
 	$lower = $e.ToLowerInvariant()
 	if ($lower.Contains('/api/projects/')) {
@@ -49,7 +49,7 @@ function Normalize-Endpoint([string]$RawEndpoint): string {
 	return "$e/openai"
 }
 
-function Invoke-AOAIGet([string]$Url, [string]$Key): object {
+function Invoke-AOAIGet([string]$Url, [string]$Key) {
 	$headers = @{ 'api-key' = $Key }
 	return Invoke-RestMethod -Method Get -Uri $Url -Headers $headers -TimeoutSec 20
 }
@@ -81,7 +81,7 @@ foreach ($v in $ApiVersions) {
 			Write-Host "Not supported: $v" -ForegroundColor DarkYellow
 			continue
 		}
-		Write-Host "Failed for $v: $msg" -ForegroundColor Red
+		Write-Host "Failed for ${v}: $msg" -ForegroundColor Red
 		continue
 	}
 }

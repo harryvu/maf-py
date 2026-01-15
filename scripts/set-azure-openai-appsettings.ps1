@@ -21,7 +21,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Resolve-Setting([string]$Value, [string[]]$EnvNames): string {
+function Resolve-Setting([string]$Value, [string[]]$EnvNames) {
 	if ($Value -and $Value.Trim().Length -gt 0) { return $Value }
 	foreach ($n in $EnvNames) {
 		$ev = [Environment]::GetEnvironmentVariable($n)
@@ -30,7 +30,7 @@ function Resolve-Setting([string]$Value, [string[]]$EnvNames): string {
 	return ''
 }
 
-function Require-NonEmpty([string]$Value, [string]$Name, [string]$Hint): void {
+function Require-NonEmpty([string]$Value, [string]$Name, [string]$Hint) {
 	if (-not $Value -or $Value.Trim().Length -eq 0) {
 		throw "Missing required value: $Name. $Hint"
 	}
