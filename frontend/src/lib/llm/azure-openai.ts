@@ -39,6 +39,18 @@ export function getAzureOpenAIConfig(
 
   const endpoint = env.AZURE_OPENAI_ENDPOINT;
   const normalizedEndpoint = endpoint ? endpoint.replace(/\/+$/, '') : undefined;
+
+  if (normalizedEndpoint) {
+    const lower = normalizedEndpoint.toLowerCase();
+    if (lower.includes('/api/projects/')) {
+      throw new Error(
+        'AZURE_OPENAI_ENDPOINT appears to be an Azure AI Foundry *project* endpoint (contains "/api/projects/"). ' +
+          'This app expects an Azure OpenAI resource endpoint (Keys & Endpoint), e.g. "https://<resource>.openai.azure.com/" ' +
+          'or "https://<resource>.cognitiveservices.azure.com/".'
+      );
+    }
+  }
+
   const normalizedEndpointBaseUrl = normalizedEndpoint
     ? normalizedEndpoint.endsWith('/openai')
       ? normalizedEndpoint
