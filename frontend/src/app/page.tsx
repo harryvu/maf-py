@@ -4,6 +4,8 @@ import { SettingsPanel } from '../components/settings';
 import { ChatInterface } from '../components/chat';
 import { useEducationalSettings } from '../hooks/useEducationalSettings';
 
+const OWASP_LLM01_URL = 'https://genai.owasp.org/llmrisk/llm01-prompt-injection/';
+
 /**
  * LLM Risk Playground - Main Page
  * Demonstrates OWASP LLM01: Prompt Injection vulnerabilities
@@ -33,7 +35,16 @@ export default function Home() {
             LLM Risk Playground
           </h1>
           <p className="text-sm text-gray-600 mt-1">
-            Educational demonstration of OWASP LLM01: Prompt Injection
+            Educational demonstration of{' '}
+            <a
+              href={OWASP_LLM01_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-700 underline hover:text-blue-900"
+            >
+              OWASP LLM01
+            </a>
+            : Prompt Injection
           </p>
         </div>
       </header>
@@ -55,7 +66,16 @@ export default function Home() {
                 About This Demo
               </h3>
               <p className="text-xs text-blue-700">
-                This playground is a safe way to explore OWASP LLM01 (Prompt Injection)
+                This playground is a safe way to explore{' '}
+                <a
+                  href={OWASP_LLM01_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-800 underline hover:text-blue-900"
+                >
+                  OWASP LLM01
+                </a>{' '}
+                (Prompt Injection)
                 and see how different defenses change outcomes.
               </p>
               <ul className="mt-2 text-xs text-blue-700 list-disc list-inside space-y-1">
