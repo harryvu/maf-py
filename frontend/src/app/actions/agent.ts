@@ -26,6 +26,17 @@ function hasPurchaseTimingInfo(message: string): boolean {
   // ISO date (YYYY-MM-DD)
   if (/\b\d{4}-\d{2}-\d{2}\b/.test(text)) return true;
 
+  // Common numeric dates (MM/DD/YYYY, M/D/YY, MM-DD-YYYY)
+  if (/\b(0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])[\/\-](\d{2}|\d{4})\b/.test(text)) return true;
+
+  // Month-name dates (e.g., "jan 10 2026", "january 10, 2026")
+  if (
+    /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(t|tember)?|oct(ober)?|nov(ember)?|dec(ember)?)\s+\d{1,2}(st|nd|rd|th)?(,)?\s+\d{4}\b/.test(
+      text
+    )
+  )
+    return true;
+
   // Relative timeframes (e.g., "10 days ago", "2 weeks ago")
   if (/\b\d+\s*(day|days|week|weeks|month|months)\s+ago\b/.test(text)) return true;
 

@@ -163,6 +163,34 @@ describe('Agent Server Action Integration', () => {
       expect(response.message).toContain('$50');
     });
 
+    it('should accept a slash date format in real mode', async () => {
+      const { generateText } = await import('ai');
+      vi.mocked(generateText).mockResolvedValue({
+        text: '{"approved": true, "response": "Approved by real LLM"}',
+      } as any);
+
+      const request: RefundRequest = {
+        orderId: 'ORD-555',
+        amount: 75,
+        message: 'I bought it on 1/10/2026 but it is defective. Please refund my money.',
+      };
+
+      const settings: EducationalSettings = {
+        ...defaultSettings,
+        simulationMode: false,
+        guardrailsEnabled: true,
+        adminBypass: false,
+      };
+
+      const response = await submitRefundRequest(request, settings);
+
+      expect(vi.mocked(generateText)).toHaveBeenCalled();
+      expect(response.success).toBe(true);
+      expect(response.refundResult?.approved).toBe(true);
+      expect(response.message).toContain('ORD-555');
+      expect(response.message).toContain('$75');
+    });
+
     it('should not approve in real mode when purchase timing is missing', async () => {
       const request: RefundRequest = {
         orderId: 'ORD-1234',
