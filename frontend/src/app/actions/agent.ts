@@ -19,6 +19,25 @@ import { detectAdminBypassWithLlm } from '../../lib/security/llm-admin-detector'
 // Track request count per session (in-memory, resets on server restart)
 let requestCount = 0;
 
+function hasPurchaseTimingInfo(message: string): boolean {
+  const text = String(message ?? '').toLowerCase();
+  if (!text.trim()) return false;
+
+  // ISO date (YYYY-MM-DD)
+  if (/\b\d{4}-\d{2}-\d{2}\b/.test(text)) return true;
+
+  // Relative timeframes (e.g., "10 days ago", "2 weeks ago")
+  if (/\b\d+\s*(day|days|week|weeks|month|months)\s+ago\b/.test(text)) return true;
+
+  // Common references
+  if (/\b(today|yesterday|last\s+week|last\s+month)\b/.test(text)) return true;
+
+  // “Purchased/bought/ordered X days/weeks/months ago” variations
+  if (/\b(purchased|bought|ordered)\b.*\b\d+\s*(day|days|week|weeks|month|months)\b/.test(text)) return true;
+
+  return false;
+}
+
 function withHardTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -205,6 +224,19 @@ export async function submitRefundRequest(
       success: false,
       message: 'Your request was blocked because it contains patterns that look like a prompt injection attempt. This is a demonstration of LLM01: Prompt Injection from the OWASP Top 10 for LLMs.',
       blocked: true,
+      securityAnalysis,
+      requestCount,
+    };
+  }
+
+  // In real mode, we cannot determine eligibility without purchase timing.
+  // Require the user to provide a purchase date or timeframe before approving/denying.
+  if (!settings.simulationMode && !isAdminBypassMessage && !hasPurchaseTimingInfo(request.message)) {
+    return {
+      success: false,
+      message:
+        'To determine eligibility under the 30-day refund window, please provide the purchase date (YYYY-MM-DD) or how many days ago you purchased the item.',
+      blocked: false,
       securityAnalysis,
       requestCount,
     };
