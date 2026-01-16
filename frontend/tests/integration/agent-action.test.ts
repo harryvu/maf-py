@@ -228,8 +228,8 @@ describe('Agent Server Action Integration', () => {
 
       expect(response.success).toBe(true);
       expect(response.refundResult?.approved).toBe(true);
-      // 2026-01-01 to 2026-01-16 => 15 days => 75% partial refund
-      expect(response.refundResult?.amount).toBe(300);
+      // Within 30 days => full refund (no partial refunds)
+      expect(response.refundResult?.amount).toBe(400);
 
       vi.useRealTimers();
     });

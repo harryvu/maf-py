@@ -16,8 +16,7 @@ export const REFUND_POLICY = `
 3. Proof of purchase (order ID) is required
 
 ## Refund Amounts
-- Full refund: Available for items returned within 14 days
-- Partial refund (75%): For items returned between 15-30 days
+- Full refund: Available for items returned within 30 days
 - No refund: After 30 days
 
 ## Maximum Refund Limits

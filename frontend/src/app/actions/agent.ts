@@ -55,10 +55,6 @@ function hasPurchaseTimingInfo(message: string): boolean {
   return false;
 }
 
-function roundCurrency(amount: number): number {
-  return Math.round((amount + Number.EPSILON) * 100) / 100;
-}
-
 function toISODate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -436,24 +432,15 @@ export async function submitRefundRequest(
 
           // Enforce the time-based policy deterministically (prevents the model from hallucinating “today”).
           // Policy:
-          // - Full refund: within 14 days
-          // - Partial refund (75%): 15-30 days
+          // - Full refund: within 30 days
           // - No refund: after 30 days
           if (typeof timingFacts.daysSincePurchase === 'number') {
             const days = timingFacts.daysSincePurchase;
-            if (days <= 14) {
+            if (days <= 30) {
               refundedAmount = request.amount;
-              if (!decision.approved) {
-                decision.approved = true;
-                decision.response = `Refund approved for order ${request.orderId}. Approved amount: $${refundedAmount}.`;
-              }
-            } else if (days >= 15 && days <= 30) {
-              refundedAmount = roundCurrency(request.amount * 0.75);
-              if (!decision.approved) {
-                decision.approved = true;
-              }
-              decision.response = `Refund approved for order ${request.orderId}. Approved amount: $${refundedAmount} (75% partial refund due to ${days} days since purchase).`;
-            } else if (days > 30) {
+              if (!decision.approved) decision.approved = true;
+              decision.response = `Refund approved for order ${request.orderId}. Approved amount: $${refundedAmount}.`;
+            } else {
               refundedAmount = 0;
               if (decision.approved) {
                 decision.approved = false;
