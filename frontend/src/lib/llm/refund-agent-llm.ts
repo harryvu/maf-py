@@ -71,6 +71,11 @@ export async function generateRefundDecisionWithLlm(args: {
   message: string;
   orderId: string;
   amount: number;
+  context?: {
+    todayISO?: string;
+    purchaseDateISO?: string;
+    daysSincePurchase?: number;
+  };
 }): Promise<LlmRefundDecision> {
   const policy = await retrievePolicy();
 
@@ -83,11 +88,18 @@ export async function generateRefundDecisionWithLlm(args: {
     'Refund policy:\n' +
     policy;
 
+  const contextLines: string[] = [];
+  if (args.context?.todayISO) contextLines.push(`Today: ${args.context.todayISO}`);
+  if (args.context?.purchaseDateISO) contextLines.push(`Customer stated purchase date: ${args.context.purchaseDateISO}`);
+  if (typeof args.context?.daysSincePurchase === 'number')
+    contextLines.push(`Days since purchase: ${args.context.daysSincePurchase}`);
+
   const prompt =
     `Order ID: ${args.orderId}\n` +
     `Requested amount: $${args.amount}\n` +
+    (contextLines.length > 0 ? `\n${contextLines.join('\n')}\n` : '\n') +
     `Customer message: ${args.message}\n\n` +
-    'Decide whether to approve the refund according to policy.';
+    'Decide whether to approve the refund according to policy. Use the provided dates as the source of truth and do not assume any other current date.';
 
   const startedAt = Date.now();
   if (shouldLogLlm()) {

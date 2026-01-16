@@ -10,7 +10,7 @@ import {
   MAX_REFUND_AMOUNT,
   isAdminBypassAttempt,
 } from '../../lib/agent/refund-agent';
-import { generateRefundDecisionWithLlm } from '../../lib/llm/refund-agent-llm';
+import { generateRefundDecisionWithLlm, ensureRefundResponseDetails } from '../../lib/llm/refund-agent-llm';
 import { analyzeForOwasp, type OwaspAnalysisResult } from '../../lib/security/owasp-analyzer';
 import { looksLikePromptInjection } from '../../lib/agent/injection-patterns';
 import { detectPromptInjectionWithLlm } from '../../lib/security/llm-injection-detector';
@@ -18,6 +18,12 @@ import { detectAdminBypassWithLlm } from '../../lib/security/llm-admin-detector'
 
 // Track request count per session (in-memory, resets on server restart)
 let requestCount = 0;
+
+type PurchaseTimingFacts = {
+  todayISO: string;
+  purchaseDateISO?: string;
+  daysSincePurchase?: number;
+};
 
 function hasPurchaseTimingInfo(message: string): boolean {
   const text = String(message ?? '').toLowerCase();
@@ -47,6 +53,77 @@ function hasPurchaseTimingInfo(message: string): boolean {
   if (/\b(purchased|bought|ordered)\b.*\b\d+\s*(day|days|week|weeks|month|months)\b/.test(text)) return true;
 
   return false;
+}
+
+function roundCurrency(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function extractPurchaseTimingFacts(message: string, now: Date): PurchaseTimingFacts {
+  const text = String(message ?? '').trim();
+  const lower = text.toLowerCase();
+
+  const todayISO = toISODate(now);
+
+  // 1) Explicit ISO date: YYYY-MM-DD
+  const isoMatch = lower.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (isoMatch) {
+    const purchase = new Date(`${isoMatch[1]}T00:00:00Z`);
+    const diffDays = Math.floor((now.getTime() - purchase.getTime()) / 86_400_000);
+    if (!Number.isNaN(purchase.getTime()) && diffDays >= 0) {
+      return { todayISO, purchaseDateISO: isoMatch[1], daysSincePurchase: diffDays };
+    }
+  }
+
+  // 2) Common numeric dates (MM/DD/YYYY or MM-DD-YYYY, also M/D/YY)
+  const numericMatch = lower.match(/\b(0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])[\/\-](\d{2}|\d{4})\b/);
+  if (numericMatch) {
+    const month = Number(numericMatch[1]);
+    const day = Number(numericMatch[2]);
+    const yearRaw = numericMatch[3];
+    const year = yearRaw.length === 2 ? 2000 + Number(yearRaw) : Number(yearRaw);
+    const purchase = new Date(Date.UTC(year, month - 1, day));
+    const diffDays = Math.floor((now.getTime() - purchase.getTime()) / 86_400_000);
+    if (!Number.isNaN(purchase.getTime()) && diffDays >= 0) {
+      return { todayISO, purchaseDateISO: toISODate(purchase), daysSincePurchase: diffDays };
+    }
+  }
+
+  // 3) Relative timeframes: “10 days ago”, “2 weeks ago”, etc.
+  const relAgo = lower.match(/\b(\d+)\s*(day|days|week|weeks|month|months)\s+ago\b/);
+  if (relAgo) {
+    const n = Number(relAgo[1]);
+    const unit = relAgo[2];
+    const multiplier = unit.startsWith('day') ? 1 : unit.startsWith('week') ? 7 : 30;
+    const diffDays = n * multiplier;
+    if (Number.isFinite(diffDays) && diffDays >= 0) {
+      const purchase = new Date(now.getTime() - diffDays * 86_400_000);
+      return { todayISO, purchaseDateISO: toISODate(purchase), daysSincePurchase: diffDays };
+    }
+  }
+
+  // 4) Common references
+  if (/\btoday\b/i.test(lower)) {
+    return { todayISO, purchaseDateISO: todayISO, daysSincePurchase: 0 };
+  }
+  if (/\byesterday\b/i.test(lower)) {
+    const purchase = new Date(now.getTime() - 1 * 86_400_000);
+    return { todayISO, purchaseDateISO: toISODate(purchase), daysSincePurchase: 1 };
+  }
+  if (/\blast\s+week\b/i.test(lower)) {
+    const purchase = new Date(now.getTime() - 7 * 86_400_000);
+    return { todayISO, purchaseDateISO: toISODate(purchase), daysSincePurchase: 7 };
+  }
+  if (/\blast\s+month\b/i.test(lower)) {
+    const purchase = new Date(now.getTime() - 30 * 86_400_000);
+    return { todayISO, purchaseDateISO: toISODate(purchase), daysSincePurchase: 30 };
+  }
+
+  return { todayISO };
 }
 
 function withHardTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -108,6 +185,8 @@ export async function submitRefundRequest(
   settings: EducationalSettings
 ): Promise<AgentResponse> {
   requestCount++;
+
+  let refundedAmount = request.amount;
 
   const requestId = createRequestId();
 
@@ -257,6 +336,8 @@ export async function submitRefundRequest(
   if (isAdminBypassMessage) {
     const response = `ADMIN MODE ACTIVATED: Approved refund of $${request.amount} for order ${request.orderId}. All security checks bypassed.`;
 
+    refundedAmount = request.amount;
+
     const refundResult: RefundResult = {
       refundId: `REF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
       orderId: request.orderId,
@@ -310,11 +391,16 @@ export async function submitRefundRequest(
             : Promise.resolve(null);
 
           const refundDecisionStartedAt = Date.now();
+
+          const now = new Date();
+          const timingFacts = extractPurchaseTimingFacts(request.message, now);
+
           const decisionPromise = withHardTimeout(
             generateRefundDecisionWithLlm({
               message: request.message,
               orderId: request.orderId,
               amount: request.amount,
+              context: timingFacts,
             }),
             20_000,
             'Refund decision LLM'
@@ -348,6 +434,40 @@ export async function submitRefundRequest(
 
           const decision = decisionSettled.value;
 
+          // Enforce the time-based policy deterministically (prevents the model from hallucinating “today”).
+          // Policy:
+          // - Full refund: within 14 days
+          // - Partial refund (75%): 15-30 days
+          // - No refund: after 30 days
+          if (typeof timingFacts.daysSincePurchase === 'number') {
+            const days = timingFacts.daysSincePurchase;
+            if (days <= 14) {
+              refundedAmount = request.amount;
+              if (!decision.approved) {
+                decision.approved = true;
+                decision.response = `Refund approved for order ${request.orderId}. Approved amount: $${refundedAmount}.`;
+              }
+            } else if (days >= 15 && days <= 30) {
+              refundedAmount = roundCurrency(request.amount * 0.75);
+              if (!decision.approved) {
+                decision.approved = true;
+              }
+              decision.response = `Refund approved for order ${request.orderId}. Approved amount: $${refundedAmount} (75% partial refund due to ${days} days since purchase).`;
+            } else if (days > 30) {
+              refundedAmount = 0;
+              if (decision.approved) {
+                decision.approved = false;
+              }
+              decision.response = `Refund request for Order ID ${request.orderId} cannot be approved as it was made after 30 days of purchase.`;
+            }
+          }
+
+          const responseWithDetails = ensureRefundResponseDetails({
+            response: decision.response,
+            orderId: request.orderId,
+            amount: request.amount,
+          });
+
           logLlmEvent('info', 'Refund decision completed', {
             requestId,
             approved: decision.approved,
@@ -368,7 +488,7 @@ export async function submitRefundRequest(
             injectionDetected: isInjection,
             response: policyOverride
               ? `The requested amount exceeds the maximum limit of $${MAX_REFUND_AMOUNT}.`
-              : decision.response,
+              : responseWithDetails,
             approved: policyOverride ? false : decision.approved,
             simulated: false,
             actuallyProcessed: false,
@@ -421,10 +541,12 @@ export async function submitRefundRequest(
       })();
 
   // Build refund result
+  if (!simulationResult.approved) refundedAmount = 0;
+
   const refundResult: RefundResult = {
     refundId: `REF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
     orderId: request.orderId,
-    amount: request.amount,
+    amount: refundedAmount,
     approved: simulationResult.approved,
     reason: simulationResult.response,
     timestamp: new Date().toISOString(),

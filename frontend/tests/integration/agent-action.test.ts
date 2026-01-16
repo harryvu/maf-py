@@ -135,6 +135,9 @@ describe('Agent Server Action Integration', () => {
     });
 
     it('should call the real LLM when simulation mode is off', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-16T12:00:00Z'));
+
       const { generateText } = await import('ai');
       vi.mocked(generateText).mockResolvedValue({
         text: '{"approved": true, "response": "Approved by real LLM"}',
@@ -161,9 +164,14 @@ describe('Agent Server Action Integration', () => {
       expect(response.message).toContain('Approved');
       expect(response.message).toContain('ORD-123');
       expect(response.message).toContain('$50');
+
+      vi.useRealTimers();
     });
 
     it('should accept a slash date format in real mode', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-16T12:00:00Z'));
+
       const { generateText } = await import('ai');
       vi.mocked(generateText).mockResolvedValue({
         text: '{"approved": true, "response": "Approved by real LLM"}',
@@ -189,6 +197,41 @@ describe('Agent Server Action Integration', () => {
       expect(response.refundResult?.approved).toBe(true);
       expect(response.message).toContain('ORD-555');
       expect(response.message).toContain('$75');
+
+      vi.useRealTimers();
+    });
+
+    it('should override an incorrect real-LLM denial when within 30 days', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-16T12:00:00Z'));
+
+      const { generateText } = await import('ai');
+      // Simulate a mistaken model denial.
+      vi.mocked(generateText).mockResolvedValue({
+        text: '{"approved": false, "response": "Refund request for Order ID ORD-1234 cannot be approved as it was made after 30 days of purchase."}',
+      } as any);
+
+      const request: RefundRequest = {
+        orderId: 'ORD-1234',
+        amount: 400,
+        message: 'I bought it on 1/1/2026 but it is defective. Please refund my money.',
+      };
+
+      const settings: EducationalSettings = {
+        ...defaultSettings,
+        simulationMode: false,
+        guardrailsEnabled: true,
+        adminBypass: false,
+      };
+
+      const response = await submitRefundRequest(request, settings);
+
+      expect(response.success).toBe(true);
+      expect(response.refundResult?.approved).toBe(true);
+      // 2026-01-01 to 2026-01-16 => 15 days => 75% partial refund
+      expect(response.refundResult?.amount).toBe(300);
+
+      vi.useRealTimers();
     });
 
     it('should not approve in real mode when purchase timing is missing', async () => {
