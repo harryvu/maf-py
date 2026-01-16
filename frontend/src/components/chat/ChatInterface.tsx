@@ -66,7 +66,7 @@ export function ChatInterface({ settings }: ChatInterfaceProps) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Refund Agent Chat</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Refund Agent</h2>
           <button
             onClick={handleClear}
             className="text-sm text-gray-500 hover:text-gray-700"
